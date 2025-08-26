@@ -37,3 +37,5 @@ async def read_root():
 if __name__ == "__main__":
     logger.info(f"Iniciando API en ambiente: {settings.ENV}")
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=settings.ENV == "development")
+
+    #Peruano

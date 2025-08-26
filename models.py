@@ -1,0 +1,172 @@
+from pydantic import BaseModel, Field, EmailStr
+from typing import List, Optional
+from datetime import datetime
+import enum
+
+# --- Enumeraciones para mejorar la legibilidad y validación ---
+
+class ProductCategory(str, enum.Enum):
+    BEER = "Cerveza"
+    WINE_RED = "Vino Tinto"
+    WINE_WHITE = "Vino Blanco"
+    WINE_ROSE = "Vino Rosado"
+    SPIRITS_WHISKY = "Whisky"
+    SPIRITS_VODKA = "Vodka"
+    SPIRITS_GIN = "Gin"
+    SPIRITS_RUM = "Ron"
+    SPIRITS_TEQUILA = "Tequila"
+    SOFT_DRINK = "Gaseosa" # Por si vendes mezcladores
+    OTHER = "Otro"
+
+class UserRole(str, enum.Enum):
+    CUSTOMER = "customer"
+    ADMIN = "admin"
+
+class OrderStatus(str, enum.Enum):
+    PENDING = "Pendiente"
+    PROCESSING = "En Proceso"
+    SHIPPED = "Enviado"
+    DELIVERED = "Entregado"
+    CANCELLED = "Cancelado"
+    REFUNDED = "Reembolsado"
+
+class PaymentStatus(str, enum.Enum):
+    PENDING = "Pendiente"
+    COMPLETED = "Completado"
+    FAILED = "Fallido"
+    REFUNDED = "Reembolsado"
+    CANCELED = "Cancelado"
+
+# --- Modelos de Datos Principales ---
+
+# Modelo para un Producto (Bebida)
+class Product(BaseModel):
+    # id se generará en la DB, por eso es Optional y str para MongoDB ObjectId
+    id: Optional[str] = Field(None, alias="_id")
+    name: str = Field(..., min_length=3, max_length=100, description="Nombre de la bebida")
+    description: Optional[str] = Field(None, max_length=500, description="Descripción detallada del producto")
+    price: float = Field(..., gt=0, description="Precio de venta (mayor que cero)")
+    category: ProductCategory = Field(..., description="Categoría de la bebida")
+    stock: int = Field(..., ge=0, description="Cantidad disponible en inventario (mayor o igual a cero)")
+    image_url: Optional[str] = Field(None, description="URL de la imagen principal del producto")
+    abv: Optional[float] = Field(None, ge=0, le=100, description="Grado alcohólico por volumen (Alcohol by Volume), 0-100%")
+    volume_ml: Optional[int] = Field(None, gt=0, description="Volumen del envase en mililitros")
+    origin: Optional[str] = Field(None, max_length=50, description="País o región de origen")
+    
+    class Config:
+        populate_by_name = True # Permite usar alias en el ID al crear o actualizar
+
+# Modelos para Usuarios
+class UserRegister(BaseModel):
+    username: str = Field(..., min_length=3, max_length=50, description="Nombre de usuario único")
+    email: EmailStr = Field(..., description="Correo electrónico válido")
+    password: str = Field(..., min_length=8, description="Contraseña segura (mínimo 8 caracteres)")
+    birth_date: datetime = Field(..., description="Fecha de nacimiento para verificación de edad")
+
+class UserLogin(BaseModel):
+    username: str = Field(..., description="Nombre de usuario o correo electrónico")
+    password: str = Field(..., description="Contraseña")
+
+class UserResponse(BaseModel):
+    id: Optional[str] = Field(None, alias="_id")
+    username: str
+    email: EmailStr
+    role: UserRole = UserRole.CUSTOMER # Por defecto, los nuevos usuarios son clientes
+    age_verified: bool = False # Se actualizará después de la verificación
+    birth_date: datetime
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    class Config:
+        populate_by_name = True # Permite usar alias en el ID al crear o actualizar
+
+# Modelos para la Autenticación JWT
+class Token(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+
+class TokenData(BaseModel):
+    username: Optional[str] = None
+    user_id: Optional[str] = None
+    roles: List[UserRole] = []
+    age_verified: bool = False # Para pasar en el token la verificación de edad
+
+
+# Modelos para Carrito de Compras
+class CartItem(BaseModel):
+    product_id: str = Field(..., description="ID del producto en el carrito")
+    quantity: int = Field(..., gt=0, description="Cantidad del producto (mayor que cero)")
+
+class Cart(BaseModel):
+    id: Optional[str] = Field(None, alias="_id")
+    user_id: str = Field(..., description="ID del usuario propietario del carrito")
+    items: List[CartItem] = [] # Lista de productos en el carrito
+    
+    class Config:
+        populate_by_name = True
+
+# Modelos para Pedidos
+class OrderItem(BaseModel):
+    product_id: str = Field(..., description="ID del producto")
+    name: str = Field(..., description="Nombre del producto al momento de la compra")
+    quantity: int = Field(..., gt=0, description="Cantidad del producto")
+    price_at_purchase: float = Field(..., gt=0, description="Precio unitario del producto al momento de la compra")
+
+class Address(BaseModel):
+    street: str
+    city: str
+    state: str
+    zip_code: str
+    country: str
+    
+class OrderCreate(BaseModel):
+    items: List[CartItem] # Usamos CartItem para la creación, luego se convierte a OrderItem
+    shipping_address: Address
+    # payment_method_id: str # ID del método de pago o de la pasarela si fuera necesario aquí
+
+class Order(BaseModel):
+    id: Optional[str] = Field(None, alias="_id")
+    user_id: str
+    items: List[OrderItem]
+    total_amount: float = Field(..., ge=0)
+    status: OrderStatus = OrderStatus.PENDING
+    shipping_address: Address
+    payment_id: Optional[str] = None # ID de la transacción de pago
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    class Config:
+        populate_by_name = True
+
+# Modelos para Pagos (Simplificado para la intención de la API)
+class PaymentRequest(BaseModel):
+    order_id: str = Field(..., description="ID del pedido a pagar")
+    payment_method: str = Field(..., description="Método de pago (ej. 'MercadoPago', 'Tarjeta de Crédito')")
+    amount: float = Field(..., gt=0, description="Monto a pagar")
+    # Podrías añadir más detalles específicos de la tarjeta aquí o dejar que la pasarela los maneje
+
+class PaymentResponseModel(BaseModel): # Renombrado para evitar conflicto con PaymentResponse
+    id: Optional[str] = Field(None, alias="_id")
+    order_id: str
+    user_id: str
+    amount: float
+    currency: str = "ARS" # O la moneda predeterminada
+    status: PaymentStatus = PaymentStatus.PENDING
+    transaction_details: Optional[dict] = None # Detalles devueltos por la pasarela de pago
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    class Config:
+        populate_by_name = True
+
+# Modelos para Gestión de Inventario / Alertas
+class InventoryAlert(BaseModel):
+    id: Optional[str] = Field(None, alias="_id")
+    product_id: str
+    product_name: str
+    current_stock: int
+    threshold: int
+    message: str
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    
+    class Config:
+        populate_by_name = True

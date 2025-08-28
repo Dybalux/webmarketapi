@@ -1,23 +1,30 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import field_validator
 from typing import Optional
 
 class Settings(BaseSettings):
-    # Clave secreta para JWT. ¡CAMBIA ESTO EN PRODUCCIÓN Y USA UNA VARIABLE DE ENTORNO SEGURA!
-    SECRET_KEY: str = "your-super-secret-key-replace-me-in-prod-12345"
+    # JWT
+    SECRET_KEY: str
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30 # Tiempo de expiración del token JWT
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
-    # Configuración de la base de datos (usaremos MongoDB con Motor)
-    DATABASE_URL: str = "mongodb://localhost:27017"
-    DATABASE_NAME: str = "bebidas_db"
+    # MongoDB
+    DATABASE_URL: str
+    DATABASE_NAME: str
 
-    # Configuración para pasarelas de pago (ejemplo)
+    # Pasarela de pagos
     MERCADOPAGO_API_KEY: Optional[str] = None
-    
-    # Entorno de la aplicación (development, production)
+
+    # Entorno
     ENV: str = "development"
 
-    # Configuración para cargar variables de entorno desde un archivo .env
+    @field_validator("ENV")
+    def validate_env(cls, v):
+        allowed = {"development", "production", "test"}
+        if v not in allowed:
+            raise ValueError(f"ENV debe ser uno de: {allowed}")
+        return v
+
     model_config = SettingsConfigDict(env_file=".env")
 
 settings = Settings()

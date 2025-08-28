@@ -1,10 +1,30 @@
+from bson import ObjectId
 from pydantic import BaseModel, Field, EmailStr
+from pydantic import GetJsonSchemaHandler
+from pydantic_core import core_schema
 from typing import List, Optional
 from datetime import datetime
+from pydantic.json_schema import JsonSchemaValue
 import enum
 
-# --- Enumeraciones para mejorar la legibilidad y validación ---
+class PyObjectId(ObjectId):
+    @classmethod
+    def __get_pydantic_json_schema__(
+        cls, core_schema: core_schema.CoreSchema, handler: GetJsonSchemaHandler
+    ) -> JsonSchemaValue:
+        return {"type": "string"}
 
+    @classmethod
+    def __get_validators__(cls):
+        yield cls.validate
+
+    @classmethod
+    def validate(cls, value, info):
+        if not ObjectId.is_valid(value):
+            raise ValueError("Invalid ObjectId")
+        return ObjectId(value)
+    
+# --- Enumeraciones para mejorar la legibilidad y validación ---
 class ProductCategory(str, enum.Enum):
     BEER = "Cerveza"
     WINE_RED = "Vino Tinto"
@@ -15,7 +35,7 @@ class ProductCategory(str, enum.Enum):
     SPIRITS_GIN = "Gin"
     SPIRITS_RUM = "Ron"
     SPIRITS_TEQUILA = "Tequila"
-    SOFT_DRINK = "Gaseosa" # Por si vendes mezcladores
+    SOFT_DRINK = "Gaseosa" 
     OTHER = "Otro"
 
 class UserRole(str, enum.Enum):
@@ -63,12 +83,13 @@ class UserRegister(BaseModel):
     password: str = Field(..., min_length=8, description="Contraseña segura (mínimo 8 caracteres)")
     birth_date: datetime = Field(..., description="Fecha de nacimiento para verificación de edad")
 
+
 class UserLogin(BaseModel):
-    username: str = Field(..., description="Nombre de usuario o correo electrónico")
+    email_or_username: str = Field(..., description="Nombre de usuario o correo electrónico")
     password: str = Field(..., description="Contraseña")
 
 class UserResponse(BaseModel):
-    id: Optional[str] = Field(None, alias="_id")
+    id: PyObjectId = Field(alias="_id")
     username: str
     email: EmailStr
     role: UserRole = UserRole.CUSTOMER # Por defecto, los nuevos usuarios son clientes
@@ -77,7 +98,10 @@ class UserResponse(BaseModel):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     
     class Config:
-        populate_by_name = True # Permite usar alias en el ID al crear o actualizar
+        populate_by_name = True
+        json_encoders = {ObjectId: lambda v: str(v)}
+        arbitrary_types_allowed = True
+
 
 # Modelos para la Autenticación JWT
 class Token(BaseModel):

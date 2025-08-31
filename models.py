@@ -8,11 +8,16 @@ import enum
 
 class PyObjectId(ObjectId):
     @classmethod
-    def __get_pydantic_core_schema__(
-        cls, source_type, handler: GetCoreSchemaHandler
-    ) -> core_schema.CoreSchema:
-        return core_schema.no_info_plain_validator_function(
-            cls.validate
+    def __get_pydantic_core_schema__(cls, source_type, handler):
+        return core_schema.union_schema(
+            [
+                core_schema.is_instance_schema(ObjectId),
+                core_schema.str_schema(),
+            ],
+            serialization=core_schema.plain_serializer_function_ser_schema(
+                lambda x: str(x),  # convierte ObjectId a str al serializar
+                when_used="always"
+            )
         )
     
     @classmethod
@@ -137,15 +142,21 @@ class Cart(BaseModel):
     user_id: str = Field(..., description="ID del usuario propietario del carrito")
     items: List[CartItem] = [] # Lista de productos en el carrito
     
-    class Config:
-        populate_by_name = True
+    model_config = {
+        "populate_by_name": True,
+        "arbitrary_types_allowed": True,
+        "json_encoders": {ObjectId: str},
+    }
 
 # Modelos para Pedidos
 class OrderItem(BaseModel):
+    _id: Optional[str] = None
     product_id: str = Field(..., description="ID del producto")
     name: str = Field(..., description="Nombre del producto al momento de la compra")
     quantity: int = Field(..., gt=0, description="Cantidad del producto")
     price_at_purchase: float = Field(..., gt=0, description="Precio unitario del producto al momento de la compra")
+    class Config:
+        populate_by_name = True
 
 class Address(BaseModel):
     street: str
@@ -160,7 +171,7 @@ class OrderCreate(BaseModel):
     # payment_method_id: str # ID del método de pago o de la pasarela si fuera necesario aquí
 
 class Order(BaseModel):
-    id: Optional[str] = Field(None, alias="_id")
+    id: Optional[PyObjectId] = Field(default=None, alias="_id")
     user_id: str
     items: List[OrderItem]
     total_amount: float = Field(..., ge=0)

@@ -1,6 +1,5 @@
 from bson import ObjectId
-from pydantic import BaseModel, Field, EmailStr
-from pydantic import GetJsonSchemaHandler
+from pydantic import BaseModel, Field, EmailStr, GetCoreSchemaHandler
 from pydantic_core import core_schema
 from typing import List, Optional
 from datetime import datetime
@@ -9,20 +8,30 @@ import enum
 
 class PyObjectId(ObjectId):
     @classmethod
+    def __get_pydantic_core_schema__(
+        cls, source_type, handler: GetCoreSchemaHandler
+    ) -> core_schema.CoreSchema:
+        return core_schema.no_info_plain_validator_function(
+            cls.validate
+        )
+    
+    @classmethod
     def __get_pydantic_json_schema__(
-        cls, core_schema: core_schema.CoreSchema, handler: GetJsonSchemaHandler
+        cls, core_schema: core_schema.CoreSchema, handler
     ) -> JsonSchemaValue:
-        return {"type": "string"}
-
+        # Esquema para documentación OpenAPI
+        return {'type': 'string', 'example': '507f1f77bcf86cd799439011'}
+    
     @classmethod
-    def __get_validators__(cls):
-        yield cls.validate
-
-    @classmethod
-    def validate(cls, value, info):
-        if not ObjectId.is_valid(value):
-            raise ValueError("Invalid ObjectId")
-        return ObjectId(value)
+    def validate(cls, value):
+        if isinstance(value, ObjectId):
+            return value
+        if isinstance(value, str):
+            try:
+                return ObjectId(value)
+            except Exception:
+                raise ValueError("Invalid ObjectId string")
+        raise TypeError("ObjectId must be a string or ObjectId instance")
     
 # --- Enumeraciones para mejorar la legibilidad y validación ---
 class ProductCategory(str, enum.Enum):
@@ -62,7 +71,7 @@ class PaymentStatus(str, enum.Enum):
 # Modelo para un Producto (Bebida)
 class Product(BaseModel):
     # id se generará en la DB, por eso es Optional y str para MongoDB ObjectId
-    id: Optional[str] = Field(None, alias="_id")
+    id: Optional[PyObjectId] = Field(default=None, alias="_id", serialization_alias="id",exclude=False)
     name: str = Field(..., min_length=3, max_length=100, description="Nombre de la bebida")
     description: Optional[str] = Field(None, max_length=500, description="Descripción detallada del producto")
     price: float = Field(..., gt=0, description="Precio de venta (mayor que cero)")
@@ -75,6 +84,9 @@ class Product(BaseModel):
     
     class Config:
         populate_by_name = True # Permite usar alias en el ID al crear o actualizar
+        json_encoders = {ObjectId: str}
+        arbitrary_types_allowed = True
+
 
 # Modelos para Usuarios
 class UserRegister(BaseModel):

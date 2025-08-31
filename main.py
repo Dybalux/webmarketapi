@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request, status
 from fastapi.responses import RedirectResponse
 from config import settings
 from database import connect_db, close_db
-from routers import auth, products, age_verification
+from routers import auth, products, age_verification, cart
 from contextlib import asynccontextmanager
 import uvicorn
 import logging
@@ -46,6 +46,8 @@ async def enforce_https(request: Request, call_next):
 app.include_router(products.router, prefix="/products", tags=["Productos"])
 app.include_router(auth.router, prefix="/auth", tags=["Autenticación"])
 app.include_router(age_verification.router, prefix="/age-verification", tags=["Verificación de Edad"])
+app.include_router(cart.router, prefix="/cart", tags=["Carrito de Compras"])
+
 # Punto de entrada
 if __name__ == "__main__":
     logger.info(f"🌍 Ambiente: {settings.ENV}")

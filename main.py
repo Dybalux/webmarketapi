@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request, status
 from fastapi.responses import RedirectResponse
 from config import settings
 from database import connect_db, close_db
-from routers import auth, products, age_verification, cart, orders
+from routers import auth, products, age_verification, cart, orders,payments , inventory
 from contextlib import asynccontextmanager
 import uvicorn
 import logging
@@ -48,6 +48,8 @@ app.include_router(auth.router, prefix="/auth", tags=["Autenticación"])
 app.include_router(age_verification.router, prefix="/age-verification", tags=["Verificación de Edad"])
 app.include_router(cart.router, prefix="/cart", tags=["Carrito de Compras"])
 app.include_router(orders.router, prefix="/orders", tags=["Pedidos"])
+app.include_router(payments.router, prefix="/payments", tags=["Pagos"])
+app.include_router(inventory.router, prefix="/inventory", tags=["Inventario"])
 
 # Punto de entrada
 if __name__ == "__main__":

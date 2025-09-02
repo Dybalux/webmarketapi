@@ -64,7 +64,7 @@ async def create_order(
 
         # Construir el OrderItem con los datos actuales del producto
         order_item = OrderItem(
-            product_id=str(product["_id"]),
+            product_id=product["_id"],
             name=product["name"],
             quantity=item.quantity,
             price_at_purchase=product["price"]
@@ -156,23 +156,53 @@ async def update_order_status(
     order_id: str,
     new_status: OrderStatus, # Recibe el nuevo estado directamente como un valor del enum
     orders_collection = Depends(get_orders_collection),
+    products_collection = Depends(get_products_collection),
     current_admin_user: TokenData = Depends(get_current_admin_user)
 ):
     """
     [Admin] Actualiza el estado de un pedido.
     Requiere permisos de administrador.
     """
+    # 1. Validar el ID
     if not ObjectId.is_valid(order_id):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ID de pedido inválido.")
-        
-    result = await orders_collection.update_one(
+    
+    # 2. Obtener el pedido actual
+    current_order = await orders_collection.find_one({"_id": ObjectId(order_id)})
+    if not current_order:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pedido no encontrado.")
+    current_status = str(current_order["status"])
+
+    # 3. Reposición de stock si corresponde
+    # Lógica de reposición de stock
+    if new_status in [OrderStatus.CANCELLED, OrderStatus.REFUNDED] and current_status not in [
+    OrderStatus.CANCELLED.value, OrderStatus.REFUNDED.value
+    ]:
+        logger.info(f"El pedido {order_id} se está cancelando/reembolsando. Reponiendo stock...")
+    for item in current_order["items"]:
+        try:
+            product_oid = ObjectId(item["product_id"])
+        except Exception:
+            logger.error(f"El product_id {item['product_id']} no es válido, no se repone stock.")
+            continue
+
+        result = await products_collection.update_one(
+            {"_id": product_oid},
+            {"$inc": {"stock": item["quantity"]}}
+        )
+
+        if result.modified_count:
+            logger.info(f"Stock del producto {item['product_id']} incrementado en {item['quantity']}.")
+        else:
+            logger.warning(f"No se encontró producto con id {item['product_id']} para reponer stock.")
+
+   # 4. Actualizamos el estado del pedido
+    await orders_collection.update_one(
         {"_id": ObjectId(order_id)},
         {"$set": {"status": new_status.value, "updated_at": datetime.utcnow()}}
     )
     
-    if result.matched_count == 0:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pedido no encontrado.")
-        
+    # 5. Devolver el pedido actualizado
     updated_order = await orders_collection.find_one({"_id": ObjectId(order_id)})
     logger.info(f"Admin {current_admin_user.username} actualizó el estado del pedido {order_id} a '{new_status.value}'.")
     return Order(**updated_order)

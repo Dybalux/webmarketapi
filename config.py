@@ -12,8 +12,13 @@ class Settings(BaseSettings):
     DATABASE_URL: str
     DATABASE_NAME: str
 
-    # Pasarela de pagos
-    MERCADOPAGO_API_KEY: Optional[str] = None
+    # --- NUEVAS VARIABLES PARA MERCADO PAGO ---
+    # Tu Access Token privado de Mercado Pago (lo leerá del .env)
+    MERCADOPAGO_ACCESS_TOKEN: Optional[str] = None
+    
+    # URL base para tus webhooks (importante para desarrollo y producción)
+    # En desarrollo usaremos ngrok, en producción será tu dominio
+    WEBHOOK_BASE_URL: str = "http://localhost:8000"
 
     # Entorno
     ENV: str = "development"

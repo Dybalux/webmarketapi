@@ -1,5 +1,5 @@
 from bson import ObjectId
-from pydantic import BaseModel, Field, EmailStr, GetCoreSchemaHandler
+from pydantic import BaseModel, Field, EmailStr
 from pydantic_core import core_schema
 from typing import List, Optional
 from datetime import datetime
@@ -150,13 +150,15 @@ class Cart(BaseModel):
 
 # Modelos para Pedidos
 class OrderItem(BaseModel):
-    _id: Optional[str] = None
-    product_id: str = Field(..., description="ID del producto")
+    _id: Optional[PyObjectId] = None
+    product_id: PyObjectId  = Field(..., description="ID del producto")
     name: str = Field(..., description="Nombre del producto al momento de la compra")
     quantity: int = Field(..., gt=0, description="Cantidad del producto")
     price_at_purchase: float = Field(..., gt=0, description="Precio unitario del producto al momento de la compra")
     class Config:
         populate_by_name = True
+        json_encoders = {ObjectId: str}
+        arbitrary_types_allowed = True
 
 class Address(BaseModel):
     street: str
@@ -207,7 +209,7 @@ class PaymentResponseModel(BaseModel): # Renombrado para evitar conflicto con Pa
 
 # Modelos para Gestión de Inventario / Alertas
 class InventoryAlert(BaseModel):
-    id: Optional[str] = Field(None, alias="_id")
+    id: Optional[PyObjectId] = Field(None, alias="_id")
     product_id: str
     product_name: str
     current_stock: int

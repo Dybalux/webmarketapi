@@ -1,11 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Response
 from fastapi.security import OAuth2PasswordRequestForm # Para el formulario de login OAuth2
+from fastapi_limiter.depends import RateLimiter
 from datetime import timedelta
 from typing import Annotated
 from pymongo.errors import DuplicateKeyError
 from bson import ObjectId # Para manejar los IDs de MongoDB
 
-from models import UserRegister, UserLogin, UserResponse, Token, UserRole
+from models import UserRegister, UserLogin, UserResponse, Token, UserRole,TokenData
 from security import get_password_hash, verify_password, create_access_token, get_current_user_token_data
 from database import get_database, get_collection
 from config import settings
@@ -95,7 +96,8 @@ async def register_user(
     logger.info(f"Usuario {new_user.username} registrado con éxito.")
     return new_user
 
-@router.post("/token", response_model=Token, operation_id="auth_login_token")
+# Se permitirán un máximo de 5 intentos de login por minuto desde la misma dirección IP. Si se supera, la API devolverá automáticamente un error 429 Too Many Requests.
+@router.post("/token", response_model=Token, operation_id="auth_login_token", dependencies=[Depends(RateLimiter(times=5, seconds=60))])
 async def login_for_access_token(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
     users_collection = Depends(get_users_collection)
@@ -134,7 +136,7 @@ async def login_for_access_token(
 # --- Endpoint de prueba para verificar autenticación y obtener datos del usuario actual ---
 @router.get("/me", response_model=UserResponse, operation_id="auth_get_current_user")
 async def read_users_me(
-    current_user_token_data: Token = Depends(get_current_user_token_data),
+    current_user_token_data: TokenData = Depends(get_current_user_token_data),
     users_collection = Depends(get_users_collection)
 ):
     """

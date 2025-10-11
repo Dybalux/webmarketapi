@@ -12,9 +12,13 @@ class Settings(BaseSettings):
     DATABASE_URL: str
     DATABASE_NAME: str
 
+    # --- NUEVA VARIABLE PARA REDIS ---
+    REDIS_URL: str = "redis://localhost:6379"
+
     # --- NUEVAS VARIABLES PARA MERCADO PAGO ---
     # Tu Access Token privado de Mercado Pago (lo leerá del .env)
     MERCADOPAGO_ACCESS_TOKEN: Optional[str] = None
+    MERCADOPAGO_PUBLIC_KEY: Optional[str] = None
     
     # URL base para tus webhooks (importante para desarrollo y producción)
     # En desarrollo usaremos ngrok, en producción será tu dominio
@@ -30,6 +34,9 @@ class Settings(BaseSettings):
             raise ValueError(f"ENV debe ser uno de: {allowed}")
         return v
 
-    model_config = SettingsConfigDict(env_file=".env")
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        extra="allow"
+    )
 
 settings = Settings()

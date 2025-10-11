@@ -193,6 +193,7 @@ class PaymentRequest(BaseModel):
     amount: float = Field(..., gt=0, description="Monto a pagar")
     # Podrías añadir más detalles específicos de la tarjeta aquí o dejar que la pasarela los maneje
 
+# https://medium.com/@navneetskahlon/fastapi-and-pydantic-modern-data-validation-in-python-5fa0152f3588
 class PaymentResponseModel(BaseModel): # Renombrado para evitar conflicto con PaymentResponse
     id: Optional[str] = Field(None, alias="_id")
     order_id: str

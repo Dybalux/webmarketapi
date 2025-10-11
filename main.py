@@ -1,11 +1,14 @@
-from fastapi import FastAPI, Request, status
-from fastapi.responses import RedirectResponse
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from config import settings
 from database import connect_db, close_db
 from routers import auth, products, age_verification, cart, orders,payments , inventory
 from contextlib import asynccontextmanager
 import uvicorn
 import logging
+import redis.asyncio as redis
+from fastapi_limiter import FastAPILimiter
+from fastapi_limiter.depends import RateLimiter
 
 # Configuración de logging
 logging.basicConfig(
@@ -15,30 +18,49 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 @asynccontextmanager
-async def lifespan(app: FastAPI) -> None:
+async def lifespan(app: FastAPI):
     logger.info("🚀 Iniciando aplicación. Conectando a MongoDB...")
     await connect_db()
-    yield
-    logger.info("🛑 Cerrando aplicación. Desconectando de MongoDB...")
+
+    # Conexión a Redis para el Rate Limiter
+    try:
+        redis_connection = redis.from_url(settings.REDIS_URL, encoding="utf-8", decode_responses=True)
+        await FastAPILimiter.init(redis_connection)
+        logger.info("✅ Conectado a Redis y FastAPILimiter inicializado.")
+    except Exception as e:
+        logger.error(f"❌ No se pudo conectar a Redis o inicializar FastAPILimiter: {e}")
+
+    yield  # ⏳ Aquí corre la app
+
+    logger.info("🔴 Cerrando aplicación. Desconectando de MongoDB...")
     await close_db()
 
 app = FastAPI(
-    title="API de Bebidas Alcohólicas",
-    description="API para gestionar productos, pedidos, carritos y autenticación de usuarios",
+    title="EscabiAPI",
+    description="API para gestionar productos, pedidos, carritos, autenticación y pagos de usuarios",
     version="0.0.1",
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan
 )
 
-# Middleware para forzar HTTPS en producción
-@app.middleware("http")
-async def enforce_https(request: Request, call_next):
-    if settings.ENV.lower() == "production" and request.url.scheme != "https":
-        logger.warning(f"🔐 Redirigiendo a HTTPS: {request.url}")
-        secure_url = str(request.url).replace("http://", "https://", 1)
-        return RedirectResponse(url=secure_url, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
-    return await call_next(request)
+#Middleware
+# --- CONFIGURACIÓN DE CORS ---
+# Lista de orígenes permitidos. En producción, deberías poner aquí el dominio de tu frontend.
+# Ejemplo: ["https://www.mitienda.com", "https://mitienda.com"]
+origins = [
+    "http://localhost:3000",  # Origen común para React en desarrollo
+    "http://localhost:8080",  # Origen común para Vue en desarrollo
+    "http://localhost:4200",  # Origen común para Angular en desarrollo
+    "*"                       # Para desarrollo, permite cualquier origen. ¡SÉ CUIDADOSO EN PRODUCCIÓN!
+]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True, # Permite cookies y encabezados de autorización
+    allow_methods=["*"],    # Permite todos los métodos (GET, POST, etc.)
+    #allow_headers=["*"],    # Permite todos los encabezados
+)
 
 # Rutas principales
 

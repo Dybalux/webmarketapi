@@ -1,0 +1,53 @@
+services:
+  webmarketapi:
+    container_name: webmarketapi
+    command: python3 main.py
+    restart: always
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - ENVIRONMENT=development
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./:/app
+    env_file:
+      - .env
+    depends_on:
+      - mongo_bebidas
+      - redis_bebidas
+    stdin_open: true
+    tty: true
+  mongo_bebidas:
+    image: mongo:latest
+    container_name: mongo
+    restart: always
+    ports:
+      - "27017:27017"
+    volumes:
+      - ./data/mongo-data:/data/db
+  redis_bebidas:
+    image: redis:latest
+    container_name: redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./data/redis-data:/data
+  ngrok:
+    image: ngrok/ngrok:latest
+    container_name: ngrok
+    restart: always
+    command: http --authtoken=$NGROK_AUTH_TOKEN webmarketapi:8000
+    environment:
+      - NGROK_AUTH_TOKEN=${NGROK_AUTH_TOKEN}
+    ports:
+      - "4040:4040"
+    depends_on:
+      - webmarketapi
+
+
+networks:
+  default: 
+    name: webmarket-network

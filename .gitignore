@@ -1,7 +1,10 @@
-#Carpetas
+# Archivos de caché de Python
 __pycache__/
 venv/
 data/
 generate_secret.py
 # Variables de entorno secretas
 .env
+__pycache__/config.cpython-313.pyc
+__pycache__/config.cpython-313.pyc
+__pycache__/main.cpython-313.pyc

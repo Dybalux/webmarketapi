@@ -1,10 +1,14 @@
-# Archivos de caché de Python
-__pycache__/
-venv/
+# Archivos de Docker
 data/
-generate_secret.py
-# Variables de entorno secretas
-.env
-__pycache__/config.cpython-313.pyc
-__pycache__/config.cpython-313.pyc
-__pycache__/main.cpython-313.pyc
+
+# Backend (Python)
+backend/venv/
+backend/__pycache__/
+backend/.env
+backend/generate_secret.py
+
+# Frontend (Node.js)
+frontend/node_modules/
+frontend/dist/
+frontend/.env*
+frontend/npm-debug.log
